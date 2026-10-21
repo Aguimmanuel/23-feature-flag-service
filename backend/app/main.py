@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.evaluation import router as evaluation_router
 from app.api.flags import router as flags_router
 from app.config import Settings
 from app.db import create_database_engine, create_session_factory
@@ -30,6 +31,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(BodySizeLimitMiddleware)
     app.add_middleware(ConfiguredCORSMiddleware)
     app.include_router(flags_router)
+    app.include_router(evaluation_router, prefix="/api/v1")
     register_error_handlers(app)
     return app
 
