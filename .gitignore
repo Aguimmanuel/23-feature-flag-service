@@ -2,3 +2,18 @@ node_modules
 .env
 __pycache__
 .DS_Store
+
+# Python environments and generated files
+.venv/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Local configuration and credentials
+.env.*
+!.env.example
+
+# Frontend generated files
+dist/
