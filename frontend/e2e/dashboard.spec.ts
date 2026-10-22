@@ -4,7 +4,7 @@ import {
   type Page,
   type APIRequestContext,
 } from "@playwright/test";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 
 // Credentials come from the test process, never VITE_* variables or fixtures.
@@ -146,34 +146,66 @@ test("real stale version preserves input and reloads rather than overwriting", a
   await expect(page.getByLabel("Target groups")).toHaveValue("other-admin");
 });
 
-test("seeded hash vectors, repeatability, environment change and token refresh", async ({
+test("isolated rollout, repeatability, environment change and token refresh", async ({
   page,
+  request,
 }) => {
+  // Own the complete fixture: archived or edited demo seeds must not affect it.
+  const key = newKey();
+  await create(request, key);
+  const saved = await request.put(`/api/v1/flags/${key}/environments/staging`, {
+    headers,
+    data: {
+      enabled: true,
+      target_groups: [],
+      rollout_percentage: 25,
+      version: 1,
+    },
+  });
+  expect(saved.status()).toBe(200);
+
+  // Independent SHA-256 reference; fixed new-checkout vectors stay covered by
+  // backend/tests/unit/test_evaluator.py. Exercise both sides of the 25% split.
+  const findUser = (included: boolean) => {
+    for (let i = 0; i < 10000; i++) {
+      const id = `rollout-user-${i}`;
+      const digest = createHash("sha256").update(`${key}:${id}`, "utf8").digest("hex");
+      const bucket = Number.parseInt(digest.slice(0, 8), 16) % 10000;
+      if ((bucket < 2500) === included) return { id, bucket };
+    }
+    throw new Error(`No ${included ? "included" : "excluded"} reference user found`);
+  };
+  const included = findUser(true);
+  const excluded = findUser(false);
+
   await login(page);
-  await select(page, "new-checkout");
+  await select(page, key);
   await page.getByLabel("Environment").selectOption("staging");
-  await page.getByLabel("Synthetic user ID").fill("user-003");
+  await page.getByLabel("User groups (one per line)").fill("");
+  await page.getByLabel("Synthetic user ID").fill(included.id);
   await page
     .getByRole("button", { name: "Evaluate user", exact: true })
     .click();
   await expect(
     page.getByText("ROLLOUT_INCLUDED", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Bucket: 261", { exact: true })).toBeVisible();
+  await expect(page.getByText("Enabled · true", { exact: true })).toBeVisible();
+  await expect(page.getByText(`Bucket: ${included.bucket}`, { exact: true })).toBeVisible();
   await page
     .getByRole("button", { name: "Evaluate user", exact: true })
     .click();
-  await expect(page.getByText("Bucket: 261", { exact: true })).toBeVisible();
-  await page.getByLabel("Synthetic user ID").fill("user-001");
+  await expect(page.getByText(`Bucket: ${included.bucket}`, { exact: true })).toBeVisible();
+  await page.getByLabel("Synthetic user ID").fill(excluded.id);
   await page
     .getByRole("button", { name: "Evaluate user", exact: true })
     .click();
   await expect(
     page.getByText("ROLLOUT_EXCLUDED", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Bucket: 5415", { exact: true })).toBeVisible();
+  await expect(page.getByText("Disabled · false", { exact: true })).toBeVisible();
+  await expect(page.getByText(`Bucket: ${excluded.bucket}`, { exact: true })).toBeVisible();
   await page.getByLabel("Environment").selectOption("production");
-  await page.getByLabel("Synthetic user ID").fill("user-003");
+  await page.getByLabel("Synthetic user ID").fill(included.id);
   await page
     .getByRole("button", { name: "Evaluate user", exact: true })
     .click();
