@@ -20,8 +20,8 @@ class PreflightTests(TestCase):
     def test_missing_backend_is_a_blocker_not_a_green_skip(self):
         issues = missing_components(self.root, "backend")
         self.assertIn("Missing shared component: backend/requirements.txt", issues)
-        self.assertIn("Missing A-owned initial Alembic revision", issues)
-        self.assertIn("Missing B-owned helper tests", issues)
+        self.assertIn("Missing initial Alembic revision", issues)
+        self.assertIn("Missing client helper tests", issues)
 
     def test_an_independent_lock_is_not_accepted(self):
         self.write("uv.lock", "synthetic")
@@ -42,8 +42,8 @@ class PreflightTests(TestCase):
     def test_frontend_requires_real_scripts_and_a_lock(self):
         self.write("frontend/package.json", json.dumps({"scripts": {"build": "vite build"}}))
         issues = missing_components(self.root, "frontend")
-        self.assertIn("Missing C-owned npm script: typecheck", issues)
-        self.assertIn("Missing C-owned npm script: test", issues)
+        self.assertIn("Missing frontend npm script: typecheck", issues)
+        self.assertIn("Missing frontend npm script: test", issues)
         self.assertIn("Missing shared component: frontend/package-lock.json", issues)
 
     def test_invalid_frontend_json_is_a_sanitized_blocker(self):

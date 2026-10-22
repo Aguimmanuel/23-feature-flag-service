@@ -1,6 +1,6 @@
 """Read-only PostgreSQL test-target preflight; NOT a replacement migration harness.
 
-A must enforce these guards again before every destructive test setup/cleanup,
+The test harness must recheck guards before destructive test setup/cleanup,
 use the verified TEST_DATABASE_URL, and never overwrite DATABASE_URL to select it.
 No function in this file migrates, truncates, drops, seeds, or creates anything.
 """
@@ -106,7 +106,7 @@ def probe_test_database(settings: SafeTestSettings, connect: Callable | None = N
         try:
             from psycopg import connect
         except ImportError:
-            raise SafetyError("Install Role A's pinned backend requirements before a DB probe") from None
+            raise SafetyError("Install the shared pinned backend requirements before a DB probe") from None
     dsn = settings.test_url.replace("postgresql+psycopg://", "postgresql://", 1)
     try:
         with connect(

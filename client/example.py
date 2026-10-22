@@ -1,6 +1,6 @@
 """Example script demonstrating the Python feature flag client.
 
-This module. Shows success and fail-closed fallback paths.
+Shows successful decisions and distinguishable fail-closed fallbacks.
 
 Run with:
     EVALUATION_API_KEY=<key> python client/example.py
@@ -14,7 +14,10 @@ from __future__ import annotations
 import os
 import sys
 
-from feature_flag_client import FeatureFlagClient
+if __package__:
+    from .feature_flag_client import FeatureFlagClient
+else:
+    from feature_flag_client import FeatureFlagClient
 
 
 def main() -> int:
@@ -34,9 +37,9 @@ def main() -> int:
             user_id="user-003",
             groups=[],
         )
-        print("Success path (user-003, staging, 25% rollout):")
+        print("Evaluation (user-003, staging; result depends on saved settings):")
         print(f"  value={result['value']} reason={result['reason']} "
-              f"bucket={result.get('bucket')} fallback={result['fallback']}")
+              f"fallback={result['fallback']}")
 
         # Group match path: beta user in staging.
         result = client.evaluate(

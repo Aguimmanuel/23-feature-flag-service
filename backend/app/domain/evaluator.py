@@ -1,10 +1,10 @@
 """Pure evaluation engine for feature flags.
 
-This module. It is a pure Python function with no database,
+A pure Python function with no database,
 network, clock, or secret dependencies. Same inputs always produce the
 same output — deterministic rollout, not per-request randomness.
 
-Normative resolution order (api-contract.md section 5):
+Resolution order (documented in README.md):
   1. Invalid context -> rejected by the caller (HTTP 422), before this
      function is invoked.
   2. Missing/archived flag -> 404 FLAG_NOT_FOUND (service layer).
@@ -33,7 +33,6 @@ Reference vectors (must hold):
 from __future__ import annotations
 
 import hashlib
-from typing import Optional
 
 
 def compute_bucket(flag_key: str, user_id: str) -> int:

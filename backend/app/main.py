@@ -14,6 +14,7 @@ from app.db import create_database_engine, create_session_factory
 from app.errors import register_error_handlers
 from app.middleware import BodySizeLimitMiddleware, ConfiguredCORSMiddleware
 from app.services.static_frontend import mount_frontend
+from app.schemas import ErrorEnvelope
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -35,7 +36,10 @@ def create_app(
         finally:
             engine.dispose()
 
-    app = FastAPI(title="Feature Flag Service", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(
+        title="Feature Flag Service", version="0.1.0", lifespan=lifespan,
+        responses={code: {"model": ErrorEnvelope} for code in (401, 404, 409, 413, 422, 500, 503)},
+    )
     app.add_middleware(BodySizeLimitMiddleware)
     app.add_middleware(ConfiguredCORSMiddleware)
     app.include_router(flags_router)

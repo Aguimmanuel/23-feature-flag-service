@@ -155,7 +155,7 @@ def main() -> int:
             if arguments.stage == "record":
                 destination = ROOT / RECORD
                 if not destination.parent.is_dir() or not (destination.parent / "index.html").is_file():
-                    raise ReleaseBlocked("C's real frontend must be built before writing release metadata")
+                    raise ReleaseBlocked("The real frontend must be built before writing release metadata")
                 destination.write_text(json.dumps({"commit": commit, "branch": "main"}, sort_keys=True) + "\n", encoding="utf-8")
             elif arguments.stage in {"migrate", "seed"}:
                 if not arguments.execute or not arguments.expected_host or not arguments.expected_database:
@@ -166,9 +166,9 @@ def main() -> int:
                 )
                 probe_production_database(os.environ, database)
                 command = [sys.executable, "-m", "alembic", "upgrade", "head"] if arguments.stage == "migrate" else [sys.executable, "-m", "app.seed"]
-                # A owns both implementations. Never auto-migrate or auto-seed
-                # on startup/build or run migrations once per worker.
-                # Keep potentially unsanitized A-owned command output out of shared logs.
+                # Never auto-migrate or auto-seed on startup/build,
+                # or run migrations once per worker.
+                # Keep potentially unsanitized backend command output out of shared logs.
                 subprocess.run(command, cwd=ROOT / "backend", check=True, capture_output=True, text=True)
         print(f"Verified {arguments.stage} identity: main {commit}")
         return 0
@@ -180,7 +180,7 @@ def main() -> int:
         print("BLOCKED: a required release file or command is unavailable")
         return 2
     except subprocess.CalledProcessError:
-        print("FAIL: A-owned migration/seed command failed; do not deploy or claim success")
+        print("FAIL: backend migration/seed command failed; do not deploy or claim success")
         return 1
 
 

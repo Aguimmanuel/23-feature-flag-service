@@ -130,3 +130,18 @@ class AuditPage(ResponseModel):
     total: int
     limit: int
     offset: int
+
+
+class ErrorDetail(ResponseModel):
+    field: str
+    message: str
+
+
+class ErrorBody(ResponseModel):
+    code: str
+    message: str
+    details: list[ErrorDetail] = Field(default_factory=list)
+
+
+class ErrorEnvelope(ResponseModel):
+    error: ErrorBody

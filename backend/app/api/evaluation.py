@@ -1,13 +1,13 @@
 """Evaluation endpoints: POST /api/v1/evaluate and POST /api/v1/admin/evaluate.
 
-This module. Both routes use the same service function,
+Both routes use the same service function,
 request shape, and successful response. They differ only in the
 credential checked:
 
 - POST /api/v1/evaluate        -> X-API-Key: <EVALUATION_API_KEY>
 - POST /api/v1/admin/evaluate  -> Authorization: Bearer <ADMIN_TOKEN>
 
-Request (api-contract.md section 5):
+Request (documented in README.md):
     {"flag_key": "...", "environment": "...", "user": {"id": "...", "groups": []}}
 
 Response:
@@ -17,7 +17,7 @@ Normative resolution order is enforced by the evaluation service:
   1. Auth + validation (422 on invalid context)
   2. Missing/archived flag -> 404 FLAG_NOT_FOUND
   3. Missing config -> 404 ENVIRONMENT_CONFIG_NOT_FOUND
-  4. disabled=false -> FLAG_DISABLED
+  4. enabled=false -> FLAG_DISABLED
   5. Group match -> GROUP_MATCH
   6. Percentage rollout -> ROLLOUT_INCLUDED / ROLLOUT_EXCLUDED
 
@@ -26,8 +26,7 @@ No per-evaluation audit writes. No configuration cache.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, status
 
 from app.auth import require_admin, require_evaluation_key
 from app.db import SessionDependency
@@ -40,27 +39,10 @@ from app.services.evaluation import (
 from app.schemas import (
     EvaluationRequest,
     EvaluationResponse,
+    ErrorEnvelope,
 )
 
 router = APIRouter()
-
-
-# ---------------------------------------------------------------------------
-# Local error-schema models for OpenAPI documentation only.
-# Role A's error_response handler returns plain dicts; these shapes
-# mirror api-contract.md section 6 for the generated docs.
-# ---------------------------------------------------------------------------
-
-
-class ErrorDetail(BaseModel):
-    field: str
-    message: str
-
-
-class ErrorResponse(BaseModel):
-    code: str
-    message: str
-    details: list[ErrorDetail] = []
 
 
 # ---------------------------------------------------------------------------
@@ -112,10 +94,10 @@ def _evaluate(
     "/evaluate",
     response_model=EvaluationResponse,
     responses={
-        401: {"model": ErrorResponse},
-        404: {"model": ErrorResponse},
-        422: {"model": ErrorResponse},
-        503: {"model": ErrorResponse},
+        401: {"model": ErrorEnvelope},
+        404: {"model": ErrorEnvelope},
+        422: {"model": ErrorEnvelope},
+        503: {"model": ErrorEnvelope},
     },
     tags=["evaluation"],
 )
@@ -136,10 +118,10 @@ def client_evaluate(
     "/admin/evaluate",
     response_model=EvaluationResponse,
     responses={
-        401: {"model": ErrorResponse},
-        404: {"model": ErrorResponse},
-        422: {"model": ErrorResponse},
-        503: {"model": ErrorResponse},
+        401: {"model": ErrorEnvelope},
+        404: {"model": ErrorEnvelope},
+        422: {"model": ErrorEnvelope},
+        503: {"model": ErrorEnvelope},
     },
     tags=["evaluation"],
 )

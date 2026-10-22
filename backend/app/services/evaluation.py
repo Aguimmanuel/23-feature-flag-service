@@ -1,18 +1,16 @@
 """Evaluation service: joined configuration read + pure evaluator.
 
-This module. It retrieves active flag/config using one joined
-read (via Role A's repository interface), distinguishes the documented
+Retrieves active flag/config using one joined
+read through the shared repository, distinguishes the documented
 404 cases, calls the pure evaluator, and builds the API response. No
 audit write during evaluation.
 
-Depends on Role A's repository interface:
+Repository interface:
     app.repositories.flags.get_flag_with_environment(session, key, env)
     -> (Flag | None, FlagEnvironment | None)
 """
 
 from __future__ import annotations
-
-from typing import Optional
 
 from sqlalchemy.orm import Session
 

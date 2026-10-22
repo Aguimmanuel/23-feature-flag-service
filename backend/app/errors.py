@@ -3,7 +3,7 @@
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import OperationalError, TimeoutError as DatabaseTimeoutError
+from sqlalchemy.exc import InterfaceError, OperationalError, TimeoutError as DatabaseTimeoutError
 from starlette.exceptions import HTTPException
 
 
@@ -53,6 +53,7 @@ def register_error_handlers(app: FastAPI) -> None:
     async def database_error_handler(request: Request, exc: Exception):
         return error_response(503, "SERVICE_UNAVAILABLE", "Database service is unavailable")
 
+    app.add_exception_handler(InterfaceError, database_error_handler)
     app.add_exception_handler(OperationalError, database_error_handler)
     app.add_exception_handler(DatabaseTimeoutError, database_error_handler)
 

@@ -72,9 +72,9 @@ def main() -> int:
         base = validate_url(arguments.url)
         if not arguments.permission_confirmed or re.fullmatch(r"[0-9a-f]{40}", arguments.commit) is None:
             raise ValueError("Explicit permission and a full approved main SHA are required")
-        import httpx  # A's pinned requirements, never a separately resolved set.
+        import httpx  # The shared pinned requirements, never a separately resolved set.
     except (ValueError, ImportError):
-        print("BLOCKED: verify URL, permission, full main SHA and A's installed pinned requirements")
+        print("BLOCKED: verify URL, permission, full main SHA and the installed shared pinned requirements")
         return 2
     with httpx.Client(base_url=base, timeout=2.0, follow_redirects=False) as client:
         report = check_responses(client.get, arguments.commit)

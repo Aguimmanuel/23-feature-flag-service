@@ -9,6 +9,6 @@ if [[ ! "$PORT" =~ ^[0-9]{1,5}$ ]] || (( 10#$PORT < 1 || 10#$PORT > 65535 )); th
   exit 2
 fi
 cd backend
-# A must mount the health/audit/static adapters; this script never invents a new
-# app, runs migrations/seeds, or enables runtime mocks. A owns safe request logs.
+# The application mounts health/audit/static adapters and owns safe request logs.
+# This script never invents an app, runs migrations/seeds, or enables mocks.
 exec python -m uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --workers 1 --no-access-log

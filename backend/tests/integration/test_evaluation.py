@@ -8,7 +8,7 @@ Covers test-plan.md B-series cases:
   B05: Save then evaluate after commit -> uses committed settings
 
 These require PostgreSQL 18 per technical-spec.md section 9. They follow
-Role A's integration test pattern (create_app + SessionDependency override).
+the shared integration test pattern (create_app + SessionDependency override).
 """
 
 from __future__ import annotations
@@ -25,8 +25,14 @@ from app.domain.evaluator import compute_bucket
 
 pytestmark = pytest.mark.integration
 
-ADMIN_TOKEN = "test-admin-token"
-EVAL_KEY = "test-eval-key"
+
+def evaluation_headers(client):
+    return {"X-API-Key": client.app.state.settings.evaluation_api_key.get_secret_value()}
+
+
+def admin_headers(client):
+    token = client.app.state.settings.admin_token.get_secret_value()
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
@@ -96,12 +102,12 @@ def test_both_evaluation_routes_same_payload(app_client, session_factory):
     client_resp = app_client.post(
         "/api/v1/evaluate",
         json=body,
-        headers={"X-API-Key": EVAL_KEY},
+        headers=evaluation_headers(app_client),
     )
     admin_resp = app_client.post(
         "/api/v1/admin/evaluate",
         json=body,
-        headers={"Authorization": f"Bearer {ADMIN_TOKEN}"},
+        headers=admin_headers(app_client),
     )
 
     assert client_resp.status_code == 200
@@ -130,7 +136,7 @@ def test_unknown_flag_404(app_client, session_factory):
             "environment": "staging",
             "user": {"id": "user-001", "groups": []},
         },
-        headers={"X-API-Key": EVAL_KEY},
+        headers=evaluation_headers(app_client),
     )
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "FLAG_NOT_FOUND"
@@ -149,7 +155,7 @@ def test_archived_flag_404(app_client, session_factory):
             "environment": "staging",
             "user": {"id": "user-001", "groups": []},
         },
-        headers={"X-API-Key": EVAL_KEY},
+        headers=evaluation_headers(app_client),
     )
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "FLAG_NOT_FOUND"
@@ -177,7 +183,7 @@ def test_missing_config_404(app_client, session_factory):
             "environment": "production",
             "user": {"id": "user-001", "groups": []},
         },
-        headers={"X-API-Key": EVAL_KEY},
+        headers=evaluation_headers(app_client),
     )
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "ENVIRONMENT_CONFIG_NOT_FOUND"
@@ -197,7 +203,7 @@ def test_missing_user_id_422(app_client, session_factory):
             "environment": "staging",
             "user": {"id": "", "groups": []},
         },
-        headers={"X-API-Key": EVAL_KEY},
+        headers=evaluation_headers(app_client),
     )
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
@@ -212,7 +218,7 @@ def test_invalid_groups_422(app_client, session_factory):
             "environment": "staging",
             "user": {"id": "user-001", "groups": ["beta", "beta"]},
         },
-        headers={"X-API-Key": EVAL_KEY},
+        headers=evaluation_headers(app_client),
     )
     assert resp.status_code == 422
 
@@ -226,7 +232,7 @@ def test_invalid_flag_key_422(app_client, session_factory):
             "environment": "staging",
             "user": {"id": "user-001", "groups": []},
         },
-        headers={"X-API-Key": EVAL_KEY},
+        headers=evaluation_headers(app_client),
     )
     assert resp.status_code == 422
 
@@ -312,7 +318,7 @@ def test_evaluate_uses_committed_settings(app_client, session_factory):
             "environment": "staging",
             "user": {"id": "user-001", "groups": []},
         },
-        headers={"X-API-Key": EVAL_KEY},
+        headers=evaluation_headers(app_client),
     )
     assert resp.status_code == 200
     assert resp.json()["value"] is False

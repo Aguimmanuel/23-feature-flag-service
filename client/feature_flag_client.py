@@ -1,10 +1,10 @@
 """Reusable Python client for the Feature Flag Service evaluation API.
 
-This module. Provides a fail-closed helper:
+Provides a fail-closed evaluation helper:
 
     evaluate(flag_key, environment, user_id, groups=None)
 
-Behavior (api-contract.md section 7):
+Behavior (documented in README.md):
   - Reusable HTTPX client with a 2-second request timeout.
   - No automatic retry loop.
   - On success: returns {value, reason, fallback=False} from the server.
@@ -88,15 +88,12 @@ class FeatureFlagClient:
 
             data = response.json()
 
-            # Validate the successful response shape.
-            if not isinstance(data, dict):
-                return self._fallback("malformed-response")
-            if "value" not in data or "reason" not in data:
+            if not self._valid_response(data, flag_key, environment):
                 return self._fallback("malformed-response")
 
             return {
-                "value": bool(data["value"]),
-                "reason": str(data["reason"]),
+                "value": data["value"],
+                "reason": data["reason"],
                 "fallback": False,
             }
 
@@ -107,6 +104,28 @@ class FeatureFlagClient:
             ValueError,  # includes JSON decode errors
         ):
             return self._fallback("transport-error")
+
+    @staticmethod
+    def _valid_response(data: object, flag_key: str, environment: str) -> bool:
+        """Never turn an untrusted string/number into a successful boolean."""
+        if not isinstance(data, dict):
+            return False
+        required = {"flag_key", "environment", "value", "reason", "bucket"}
+        if not required <= data.keys() or type(data["value"]) is not bool:
+            return False
+        if data["flag_key"] != flag_key or data["environment"] != environment:
+            return False
+        decisions = {
+            "FLAG_DISABLED": False, "GROUP_MATCH": True,
+            "ROLLOUT_INCLUDED": True, "ROLLOUT_EXCLUDED": False,
+        }
+        reason = data["reason"]
+        if type(reason) is not str or reason not in decisions or data["value"] is not decisions[reason]:
+            return False
+        bucket = data["bucket"]
+        if reason in {"FLAG_DISABLED", "GROUP_MATCH"}:
+            return bucket is None
+        return type(bucket) is int and 0 <= bucket <= 9999
 
     def _fallback(self, category: Optional[str] = None) -> dict:
         """Return the fail-closed fallback result.
