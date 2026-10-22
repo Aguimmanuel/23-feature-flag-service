@@ -1,0 +1,32 @@
+# Configuration draft ONLY. Applying a Blueprint can create resources and trigger
+# an initial deployment even with automatic deploys off. Do not apply without
+# explicit approval, provider/account review, and a verified main release.
+services:
+  - type: web
+    name: feature-flag-service
+    runtime: python
+    plan: free
+    region: frankfurt # Candidate only; verify matching Neon region before approval.
+    branch: main
+    autoDeployTrigger: 'off'
+    buildCommand: bash scripts/render/build.sh
+    startCommand: bash scripts/render/start.sh
+    healthCheckPath: /health/ready
+    envVars:
+      - key: PYTHON_VERSION
+        value: '3.12.15'
+      - key: NODE_VERSION
+        value: '24.22.1'
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: EVALUATION_API_KEY
+        generateValue: true
+      - key: APPROVED_RELEASE_COMMIT
+        sync: false
+# No Render database, paid instance, deploy hook, preview, persistent disk, or
+# preDeployCommand is created. Free-plan migrations use the separately approved
+# explicitly authorized operator commands, never build/start auto-migrations.
