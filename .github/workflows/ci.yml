@@ -1,0 +1,132 @@
+name: Feature Flag CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+# No deploy job, production secrets, write token, or pull_request_target event.
+permissions:
+  contents: read
+
+concurrency:
+  group: feature-flags-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-policy:
+    name: Source policy and tested identity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Release PRs must originate from this repository's develop
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          test "$HEAD_BRANCH" = develop
+          test "$HEAD_REPOSITORY" = "$BASE_REPOSITORY"
+      - name: Record tested checkout versus PR head/base
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          printf 'event=%s\ntested_checkout=%s\npr_head=%s\npr_base=%s\n' \
+            "$EVENT_NAME" "$(git rev-parse HEAD)" "$PR_HEAD_SHA" "$PR_BASE_SHA"
+          # pull_request normally tests a synthetic merge, not the head alone.
+          # A push run on develop records the actual combined develop commit.
+
+  backend:
+    name: Python 3.12 / real PostgreSQL 18 / helper
+    needs: source-policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      APP_ENV: test
+      # These credentials identify disposable runner databases, never a provider.
+      DATABASE_URL: postgresql+psycopg://feature_flags_app:ci-disposable-app-only@127.0.0.1:55432/feature_flags_dev
+      TEST_DATABASE_URL: postgresql+psycopg://feature_flags_app:ci-disposable-app-only@127.0.0.1:55432/feature_flags_test
+      ADMIN_TOKEN: ci-disposable-admin-token-not-for-deployment
+      EVALUATION_API_KEY: ci-disposable-evaluation-key-not-for-deployment
+      PYTHONPATH: ${{ github.workspace }}/backend:${{ github.workspace }}:${{ github.workspace }}/client
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.15"
+      - name: Require shared API/evaluation implementation (never skip missing tests)
+        run: python scripts/operations/ci_preflight.py --scope backend
+      - name: Install the single shared pinned dependency set
+        run: python -m pip install --require-hashes -r backend/requirements.txt
+      - name: Native PostgreSQL 18 on the isolated runner (no developer Docker requirement)
+        run: bash scripts/ci/start_postgres.sh
+      - name: Read-only test-target and actual version safety check
+        run: python scripts/operations/db_guard.py --connect
+      - name: Backend tests and the shared guarded migration bootstrap
+        run: |
+          mkdir -p reports
+          cd backend
+          python -m pytest --junitxml=../reports/backend.xml
+      - name: Helper tests with the same installed requirements
+        run: python -m pytest client/tests --junitxml=reports/client.xml
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: backend-helper-results-${{ github.sha }}
+          path: reports/*.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+  frontend:
+    name: Node 24 / types / UI tests / production build
+    needs: source-policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.22.1"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.15"
+      - name: Require the frontend's committed lock and scripts
+        run: python scripts/operations/ci_preflight.py --scope frontend
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run typecheck
+        working-directory: frontend
+      - run: npm test -- --run
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+
+  required-checks:
+    name: Required checks (no skipped-job success)
+    if: always()
+    needs: [source-policy, backend, frontend]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every required job must have succeeded
+        env:
+          SOURCE_RESULT: ${{ needs.source-policy.result }}
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+        run: |
+          test "$SOURCE_RESULT" = success
+          test "$BACKEND_RESULT" = success
+          test "$FRONTEND_RESULT" = success

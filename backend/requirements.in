@@ -1,0 +1,12 @@
+fastapi>=0.115,<1
+pydantic>=2,<3
+pydantic-settings>=2,<3
+SQLAlchemy>=2,<3
+psycopg[binary]>=3,<4
+alembic>=1,<2
+uvicorn>=0.30,<1
+pytest>=8,<10
+httpx>=0.27,<1
+
+# Keep the TestClient release compatible with the selected HTTPX 0.x test stack.
+starlette>=0.40,<1
