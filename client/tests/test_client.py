@@ -15,7 +15,7 @@ import json
 import httpx
 import pytest
 
-from feature_flag_client import FeatureFlagClient
+from client.feature_flag_client import FeatureFlagClient
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ def test_client_success_group_match():
 
     assert result["value"] is True
     assert result["reason"] == "GROUP_MATCH"
-    assert "bucket" not in result  # client omits bucket per api-contract.md section 7
+    assert "bucket" not in result  # the helper returns only the decision and fallback status
     assert result["fallback"] is False
 
 

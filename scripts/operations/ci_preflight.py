@@ -33,11 +33,11 @@ def missing_components(root: Path, scope: str) -> list[str]:
         if lock.is_file():
             text = lock.read_text(encoding="utf-8")
             if "==" not in text or "--hash=sha256:" not in text:
-                issues.append("A's requirements.txt must contain exact pins and hashes")
+                issues.append("The shared requirements.txt must contain exact pins and hashes")
         if not any((root / "backend/migrations/versions").glob("*.py")):
-            issues.append("Missing A-owned initial Alembic revision")
+            issues.append("Missing initial Alembic revision")
         if not any((root / "client/tests").glob("test_*.py")):
-            issues.append("Missing B-owned helper tests")
+            issues.append("Missing client helper tests")
         for relative in ("uv.lock", "backend/uv.lock"):
             lock_path = root / relative
             if lock_path.exists():
@@ -65,7 +65,7 @@ def missing_components(root: Path, scope: str) -> list[str]:
                 scripts = data.get("scripts", {})
                 for name in ("typecheck", "test", "build"):
                     if type(scripts.get(name)) is not str or not scripts[name].strip():
-                        issues.append(f"Missing C-owned npm script: {name}")
+                        issues.append(f"Missing frontend npm script: {name}")
             except (ValueError, AttributeError):
                 issues.append("Invalid frontend package.json")
         lock = root / "frontend/package-lock.json"

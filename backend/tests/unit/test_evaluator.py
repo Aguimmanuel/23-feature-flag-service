@@ -202,54 +202,16 @@ def test_case_sensitive_group_matching():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-def test_bucket_equals_threshold_excluded():
-    """E08: bucket == rollout*100 -> excluded."""
-    # bucket 261 for new-checkout/user-003. Use rollout such that
-    # rollout*100 == 261 -> not possible (261 not divisible by 100).
-    # Instead craft a flag/user whose bucket equals a threshold.
-    # Find a user_id where bucket == 2500 for 25% threshold.
-    # We test the predicate directly: bucket == threshold -> excluded.
-    result = evaluate_config(
-        flag_key="boundary-test",
-        user_id="bucket-2500",
-        user_groups=[],
-        enabled=True,
-        target_groups=[],
-        rollout_percentage=25,
-    )
-    bucket = compute_bucket("boundary-test", "bucket-2500")
-    if bucket == 2500:
-        assert result["value"] is False
-        assert result["reason"] == "ROLLOUT_EXCLUDED"
-    else:
-        # If we didn't hit the exact boundary, test one below is included.
-        pytest.skip(f"bucket={bucket}, not exactly 2500; boundary not hit")
-
-
-@pytest.mark.unit
-def test_bucket_one_below_threshold_included():
-    """E08: One bucket below threshold -> included."""
-    # Find a user where bucket = 2499 for 25% (threshold 2500).
-    # Search a small space.
-    for i in range(10000):
-        uid = f"boundary-user-{i}"
-        b = compute_bucket("boundary-test", uid)
-        if b == 2499:
-            result = evaluate_config(
-                flag_key="boundary-test",
-                user_id=uid,
-                user_groups=[],
-                enabled=True,
-                target_groups=[],
-                rollout_percentage=25,
-            )
-            assert result == {
-                "value": True,
-                "reason": "ROLLOUT_INCLUDED",
-                "bucket": 2499,
-            }
-            return
-    pytest.skip("Could not find user with bucket 2499 in search space")
+@pytest.mark.parametrize("bucket,value,reason", [
+    (2499, True, "ROLLOUT_INCLUDED"),
+    (2500, False, "ROLLOUT_EXCLUDED"),
+    (2501, False, "ROLLOUT_EXCLUDED"),
+])
+def test_rollout_threshold_boundaries(monkeypatch, bucket, value, reason):
+    """Test the exact decision boundary independently of hash distribution."""
+    monkeypatch.setattr("app.domain.evaluator.compute_bucket", lambda flag, user: bucket)
+    result = evaluate_config("boundary-test", "boundary-user", [], True, [], 25)
+    assert result == {"value": value, "reason": reason, "bucket": bucket}
 
 
 # ---------------------------------------------------------------------------

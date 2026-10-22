@@ -1,5 +1,10 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = [".", ".."]
 addopts = "-ra"
 filterwarnings = ["default"]
+
+markers = [
+    "unit: isolated component checks",
+    "integration: checks using the guarded PostgreSQL test database",
+]
